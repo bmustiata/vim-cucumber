@@ -20,17 +20,17 @@ let b:undo_ftplugin = "setl fo< com< cms< ofu<"
 
 let b:cucumber_root = expand('%:p:h:s?.*[\/]\%(features\|stories\)\zs[\/].*??')
 if !exists("b:cucumber_steps_glob")
-  let b:cucumber_steps_glob = b:cucumber_root.'/**/*.rb'
+  let b:cucumber_steps_glob = b:cucumber_root.'/**/*.js'
 endif
 
 if !exists("g:no_plugin_maps") && !exists("g:no_cucumber_maps")
   cnoremap <SID>foldopen <Bar>if &foldopen =~# 'tag'<Bar>exe 'norm! zv'<Bar>endif
   nnoremap <silent> <script> <buffer> [<C-D>      :<C-U>exe <SID>jump('edit',v:count)<SID>foldopen<CR>
   nnoremap <silent> <script> <buffer> ]<C-D>      :<C-U>exe <SID>jump('edit',v:count)<SID>foldopen<CR>
-  nnoremap <silent> <script> <buffer> <C-W>d      :<C-U>exe <SID>jump('split',v:count)<SID>foldopen<CR>
-  nnoremap <silent> <script> <buffer> <C-W><C-D>  :<C-U>exe <SID>jump('split',v:count)<SID>foldopen<CR>
-  nnoremap <silent> <script> <buffer> [d          :<C-U>exe <SID>jump('pedit',v:count)<CR>
-  nnoremap <silent> <script> <buffer> ]d          :<C-U>exe <SID>jump('pedit',v:count)<CR>
+  nnoremap <silent> <script> <buffer> <C-W>d      :<C-U>exe <SID>jump('vsplit',v:count)<SID>foldopen<CR>
+  nnoremap <silent> <script> <buffer> <C-W><C-D>  :<C-U>exe <SID>jump('vsplit',v:count)<SID>foldopen<CR>
+  nnoremap <silent> <script> <buffer> [d          :<C-U>exe <SID>jump('tab',v:count)<CR>
+  nnoremap <silent> <script> <buffer> ]d          :<C-U>exe <SID>jump('tab',v:count)<CR>
   let b:undo_ftplugin .=
         \ "|sil! nunmap <buffer> [<C-D>" .
         \ "|sil! nunmap <buffer> ]<C-D>" .
@@ -40,6 +40,16 @@ if !exists("g:no_plugin_maps") && !exists("g:no_cucumber_maps")
         \ "|sil! nunmap <buffer> ]d"
 endif
 
+"
+" This jumps at the given command. Note that the steps have the following
+" format:
+" [
+"   0 - file name
+"   1 - line number
+"   2 - type (Given/When/Then)
+"   3 - expression (regex)
+" ]
+"
 function! s:jump(command,count)
   let steps = s:steps('.')
   if len(steps) == 0 || len(steps) < a:count
@@ -52,8 +62,18 @@ function! s:jump(command,count)
   endif
 endfunction
 
+"
+" allsteps: this function attempts to find all the steps that are defined
+"           in the feature folder.
+"           In order to do that it will first check if the line is a step line
+"           using the `step_pattern` expression. If that is the case it will be
+"           added to the steps, using the `expression_pattern` in order to
+"           extract the regexp outside it.
+"
 function! s:allsteps()
   let step_pattern = '\C^\s*\K\k*\>\s*(\=\s*\zs\S.\{-\}\ze\s*)\=\s*\%(do\|{\)\s*\%(|[^|]*|\s*\)\=\%($\|#\)'
+  let step_pattern = '\C^\s*\(this\)\.\(Given\|When\|Then\|defineStep\).*\%(\/.*\/\)'
+  let expression_pattern = '\C\/.*\/'
   let steps = []
   for file in split(glob(b:cucumber_steps_glob),"\n")
     let lines = readfile(file)
@@ -62,7 +82,7 @@ function! s:allsteps()
       let num += 1
       if line =~ step_pattern
         let type = matchstr(line,'\w\+')
-        let steps += [[file,num,type,matchstr(line,step_pattern)]]
+        let steps += [[file,num,type,matchstr(line,expression_pattern)]]
       endif
     endfor
   endfor
@@ -78,6 +98,11 @@ function! s:steps(lnum)
   return filter(s:allsteps(),'s:stepmatch(v:val[3],step)')
 endfunction
 
+"
+" stepmatch: this function checks if the target (a.k.a. string value) matches
+" against the receiver (a.k.a. expression)
+" @return 1 if matches, 0 if it doesn't.
+"
 function! s:stepmatch(receiver,target)
   if a:receiver =~ '^[''"].*[''"]$'
     let pattern = '^'.escape(substitute(a:receiver[1:-2],'$\w\+','(.*)','g'),'/').'$'
@@ -111,6 +136,7 @@ function! CucumberComplete(findstart,base) abort
   let group = synIDattr(synID(line('.'),indent+1,1),'name')
   let type = matchstr(group,'\Ccucumber\zs\%(Given\|When\|Then\)')
   let e = matchend(getline('.'),'^\s*\S\+\s')
+
   if type == '' || col('.') < col('$') || e < 0
     return -1
   endif

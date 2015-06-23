@@ -68,8 +68,12 @@ endfunction
 "
 " allsteps: this function attempts to find all the steps that are defined in the feature folder. In order to do that it will first check if the line is a step line using the `step_pattern` expression. If that is the case it will be added to the steps, using the `expression_pattern` in order to extract the regexp outside it.
 "
-function! s:allsteps()
+function! cucumber#allsteps()
   let step_pattern = '\C^\s*\K\k*\>\s*(\=\s*\zs\S.\{-\}\ze\s*)\=\s*\%(do\|{\)\s*\%(|[^|]*|\s*\)\=\%($\|#\)'
+
+  " FIXME: define modes, such as cucumber, cucumber-js or behave to autofetch
+  " the expressions
+
   let step_pattern = '\C^\s*\(this\)\.\(Given\|When\|Then\|defineStep\).*\%(\/.*\/\)'
   let expression_pattern = '\C\/.*\/'
   let steps = []
@@ -87,13 +91,17 @@ function! s:allsteps()
   return steps
 endfunction
 
+function! Yolo()
+  echo "yolo"
+endfunction
+
 function! s:steps(lnum)
   let c = match(getline(a:lnum), '\S') + 1
   while synIDattr(synID(a:lnum,c,1),'name') !~# '^$\|Region$'
     let c = c + 1
   endwhile
   let step = matchstr(getline(a:lnum)[c-1 : -1],'^\s*\zs.\{-\}\ze\s*$')
-  return filter(s:allsteps(),'s:stepmatch(v:val[3],step)')
+  return filter(cucumber#allsteps(),'s:stepmatch(v:val[3],step)')
 endfunction
 
 "

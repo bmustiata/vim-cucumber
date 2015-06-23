@@ -1,6 +1,6 @@
 " Vim filetype plugin
 " Language:	Cucumber
-" Maintainer:	Tim Pope <vimNOSPAM@tpope.org>
+" Maintainer:	Bogdan Mustiata <bogdan.mustiata@gmail.com>
 " Last Change:	2013 Jun 01
 
 " Only do this when not done yet for this buffer
@@ -14,7 +14,6 @@ set cpo&vim
 
 setlocal formatoptions-=t formatoptions+=croql
 setlocal comments=:# commentstring=#\ %s
-setlocal omnifunc=CucumberComplete
 
 let b:undo_ftplugin = "setl fo< com< cms< ofu<"
 
@@ -23,6 +22,10 @@ if !exists("b:cucumber_steps_glob")
   let b:cucumber_steps_glob = b:cucumber_root.'/**/*.js'
 endif
 
+"
+" This registers the shortcuts only if the no_plugin_maps and no_cucumber_maps
+" global options are defined.
+"
 if !exists("g:no_plugin_maps") && !exists("g:no_cucumber_maps")
   cnoremap <SID>foldopen <Bar>if &foldopen =~# 'tag'<Bar>exe 'norm! zv'<Bar>endif
   nnoremap <silent> <script> <buffer> [<C-D>      :<C-U>exe <SID>jump('edit',v:count)<SID>foldopen<CR>
@@ -63,12 +66,7 @@ function! s:jump(command,count)
 endfunction
 
 "
-" allsteps: this function attempts to find all the steps that are defined
-"           in the feature folder.
-"           In order to do that it will first check if the line is a step line
-"           using the `step_pattern` expression. If that is the case it will be
-"           added to the steps, using the `expression_pattern` in order to
-"           extract the regexp outside it.
+" allsteps: this function attempts to find all the steps that are defined in the feature folder. In order to do that it will first check if the line is a step line using the `step_pattern` expression. If that is the case it will be added to the steps, using the `expression_pattern` in order to extract the regexp outside it.
 "
 function! s:allsteps()
   let step_pattern = '\C^\s*\K\k*\>\s*(\=\s*\zs\S.\{-\}\ze\s*)\=\s*\%(do\|{\)\s*\%(|[^|]*|\s*\)\=\%($\|#\)'
@@ -129,45 +127,6 @@ endfunction
 
 function! s:bsub(target,pattern,replacement)
   return  substitute(a:target,'\C\\\@<!'.a:pattern,a:replacement,'g')
-endfunction
-
-function! CucumberComplete(findstart,base) abort
-  let indent = indent('.')
-  let group = synIDattr(synID(line('.'),indent+1,1),'name')
-  let type = matchstr(group,'\Ccucumber\zs\%(Given\|When\|Then\)')
-  let e = matchend(getline('.'),'^\s*\S\+\s')
-
-  if type == '' || col('.') < col('$') || e < 0
-    return -1
-  endif
-  if a:findstart
-    return e
-  endif
-  let steps = []
-  for step in s:allsteps()
-    if step[2] ==# type
-      if step[3] =~ '^[''"]'
-        let steps += [step[3][1:-2]]
-      elseif step[3] =~ '^/\^.*\$/$'
-        let pattern = step[3][2:-3]
-        let pattern = substitute(pattern,'\C^(?:|I )','I ','')
-        let pattern = s:bsub(pattern,'\\[Sw]','w')
-        let pattern = s:bsub(pattern,'\\d','1')
-        let pattern = s:bsub(pattern,'\\[sWD]',' ')
-        let pattern = s:bsub(pattern,'\[\^\\\="\]','_')
-        let pattern = s:bsub(pattern,'[[:alnum:]. _-][?*]?\=','')
-        let pattern = s:bsub(pattern,'\[\([^^]\).\{-\}\]','\1')
-        let pattern = s:bsub(pattern,'+?\=','')
-        let pattern = s:bsub(pattern,'(\([[:alnum:]. -]\{-\}\))','\1')
-        let pattern = s:bsub(pattern,'\\\([[:punct:]]\)','\1')
-        if pattern !~ '[\\()*?]'
-          let steps += [pattern]
-        endif
-      endif
-    endif
-  endfor
-  call filter(steps,'strpart(v:val,0,strlen(a:base)) ==# a:base')
-  return sort(steps)
 endfunction
 
 let &cpo = s:keepcpo
